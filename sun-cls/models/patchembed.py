@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mmcv.cnn import build_conv_layer, build_norm_layer
+from mmcv.cnn import build_conv_layer, build_norm_layer, ConvModule
 from mmcv.runner import BaseModule
 from mmcv.utils import to_2tuple
 
@@ -206,7 +206,7 @@ class PatchEmbed(BaseModule):
 
 class PatchEmbed3D(BaseModule):
     """
-    This module perform Patch Embed using Conv layers. The difference between
+    This module performs Patch Embed using Conv layers. The difference between
     this and other PE is it returns a 3D tensor like Conv instead of 2D seq
     Args:
         patch_size (int): patch size of PE, default is 16 in vanilla ViT
@@ -219,4 +219,33 @@ class PatchEmbed3D(BaseModule):
     def __init__(self,
                  patch_size=16,
                  stride=16,
-                 ):
+                 padding=0,
+                 in_channels=3,
+                 out_channels=768,
+                 norm_cfg=None):
+        super(PatchEmbed3D, self).__init__()
+        patch_size = to_2tuple(patch_size)
+        stride = to_2tuple(stride)
+        padding = to_2tuple(padding)
+        self.conv = nn.Conv2d(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=patch_size,
+            stride=stride,
+            padding=padding
+        )
+        self.norm = build_norm_layer(norm_cfg, out_channels) \
+            if norm_cfg is not None else nn.Identity()
+
+    def forward(self, x):
+        """
+        Args:
+            x (Tensor): Has shape (B, C, H, W). In most case, C is 3.
+
+        Returns:
+            x (Tensor): Has shape (B, C, H, W)
+        """
+        out = self.conv(x)
+        out = self.norm(out)
+
+        return out
