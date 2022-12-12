@@ -1,3 +1,4 @@
+import os
 import sys
 import argparse
 import logging
@@ -28,6 +29,8 @@ def parse_args():
                         help='Print all layers of model')
     parser.add_argument('--layer', default=None, type=str,
                         help='Model layer to all channel activation map')
+    parser.add_argument('--before', action='store_true',
+                        help='Visualize input feature maps instead of output')
     parser.add_argument('--num-chans', default=None, type=int,
                         help='Number of channels to visualize, default is all')
     parser.add_argument('--checkpoint', default='', type=str, metavar='PATH',
@@ -104,7 +107,11 @@ def main():
         inp_tensor = transform(image)[None] # expand for batch dim
         inp_tensor.to(device)
         model(inp_tensor)
-        activations = hook.output
+        if not args.before:
+            activations = hook.output
+        else:
+            activations = hook.input[0]
+        s = "input" if args.before else "output"
         _logger.info(f"Activation map at layer {str(layer)} has shape: {activations.shape}")
         # visualize
         activations = activations[0].cpu().numpy()
@@ -116,7 +123,9 @@ def main():
                 axes[i, j].imshow(activations[i+j, :, :])
                 axes[i, j].axis('off')
         if args.save_path is not None:
-            plt.savefig(f"{args.save_path}/vis_{layer}.png")
+            if not os.path.exists(args.save_path):
+                os.makedirs(args.save_path)
+            plt.savefig(f"{args.save_path}/vis_{layer}_{s}.png")
         if args.view:
             plt.show()
 

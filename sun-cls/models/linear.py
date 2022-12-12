@@ -1,8 +1,12 @@
+import random
+
 import torch
 import torch.nn as nn
 
 from mmcv.runner import BaseModule
-from mmcv.cnn import ConvModule, build_activation_layer
+from mmcv.cnn import build_activation_layer
+
+from timm.models.layers import trunc_normal_
 
 
 class FFN(BaseModule):
@@ -22,14 +26,21 @@ class FFN(BaseModule):
 
         hidden_channels = hidden_channels or in_channels
         out_channels = out_channels or in_channels
-        self.fc1 = ConvModule(in_channels,
-                              hidden_channels,
-                              kernel_size=1,
-                              act_cfg=act_cfg)
+        self.fc1 = nn.Conv2d(in_channels,
+                             hidden_channels,
+                             kernel_size=1)
+        self.act = build_activation_layer(act_cfg)
         self.fc2 = nn.Conv2d(hidden_channels,
                              out_channels,
                              kernel_size=1)
         self.drop = nn.Dropout(drop_rate)
+        self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Conv2d):
+            trunc_normal_(m.weight, std=.02)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         identity = x
@@ -72,6 +83,13 @@ class GhostFFN(BaseModule):
                              out_channels,
                              kernel_size=1)
         self.drop = nn.Dropout(drop_rate)
+        self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Conv2d):
+            trunc_normal_(m.weight, std=.02)
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         identity = x
