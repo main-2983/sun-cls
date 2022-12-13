@@ -130,6 +130,7 @@ class GhostPoolBlock(BaseModule):
 class GhostPool(BaseModule):
     def __init__(self,
                  in_channels=3,
+                 num_classes=1000,
                  embed_dims=[64, 128, 320, 512],
                  num_stages=4,
                  num_layers=[2, 2, 6, 2],
@@ -143,6 +144,7 @@ class GhostPool(BaseModule):
                  norm_layer=ModifiedLayerNorm,
                  use_layer_scale=True,
                  layer_scale_init_val=1e-5,
+                 features_only=False,
                  init_cfg=None):
         super(GhostPool, self).__init__(init_cfg)
 
@@ -151,6 +153,7 @@ class GhostPool(BaseModule):
         self.num_layers = num_layers
         self.patch_size = patch_size
         self.strides    = strides
+        self.feature_only = features_only
 
         assert num_stages == len(num_layers) == len(patch_size) \
             == len(strides)
@@ -188,3 +191,19 @@ class GhostPool(BaseModule):
             self.stages.append(
                 nn.ModuleList([patch_embed, blocks])
             )
+
+        if not features_only:
+            # add classifier head
+            self.norm = norm_layer(embed_dims[-1])
+            self.head = nn.Linear(embed_dims[-1], num_classes) if num_classes > 0 else nn.Identity()
+            self.apply(self.cls_init_weight)
+
+    # init for classification
+    def cls_init_weight(self, m):
+        if isinstance(m, nn.Linear):
+            trunc_normal_(m.weight, std=.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, x):
+        outs = []
