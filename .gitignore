@@ -1,2 +1,3 @@
-./.idea
-./Dataset
+.idea/
+Dataset
+sun-cls/visualize/
