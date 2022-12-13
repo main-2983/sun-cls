@@ -5,7 +5,7 @@ import torch.nn as nn
 
 class IOHook:
     """
-    This hook attached to a nn.Module, it supports both backward and forward hooks
+    This hook attached to a nn.Module, it supports both backward and forward hooks.
     This hook provides access to feature maps from a nn.Module, it can be either
     the input feature maps to that nn.Module, or output feature maps from nn.Module
     Args:
@@ -28,6 +28,12 @@ class IOHook:
 
 
 class LayerForwardTimerHook:
+    """
+    This hook attached to a nn.Module to measure the forward time of that module.
+    Call self.eval to get the execution time after perform a forward pass to a module.
+    Args:
+         module (nn.Module): a module to attach to hook
+    """
     def __init__(self, module: nn.Module):
         self.pre_forward = module.register_forward_pre_hook(self.set_start_timer)
         self.after_forward = module.register_forward_hook(self.set_end_timer)
