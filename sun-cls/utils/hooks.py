@@ -44,38 +44,3 @@ class LayerForwardTimerHook:
     def close(self):
         self.pre_forward.remove()
         self.after_forward.remove()
-
-
-class ModuleForwardTimerHook:
-    def __init__(self, module: nn.Module):
-        module_length = self._get_module_length(module)
-
-
-    def _get_module_length(self, module: nn.Module):
-        length = 0
-        for m in module.modules():
-            if type(m) != nn.Sequential and type(m) != nn.ModuleList:
-                length += 1
-        return length
-
-    def _attach_hook_single(self, module: nn.Module, hook):
-
-
-# Test
-if __name__ == '__main__':
-    import torch
-    a = nn.Conv2d(3, 3, 3)
-    feats = torch.rand((1, 3, 20, 20))
-    c = a(feats)
-    hook = LayerForwardTimerHook(a)
-    b = a(feats)
-    print(hook.start)
-    print(hook.end)
-    print(f"{hook.eval}")
-    hook.close()
-    start = time.time()
-    b = a(feats)
-    end = time.time()
-    print(start)
-    print(end)
-    print(f"{end - start}")
