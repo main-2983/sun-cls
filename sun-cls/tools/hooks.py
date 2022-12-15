@@ -1,6 +1,5 @@
 import time
-from typing import Union, List
-from collections import Iterable
+from typing import List, Union
 
 import torch.nn as nn
 
@@ -55,19 +54,24 @@ class LayerForwardTimerHook:
 
 
 class ModuleForwardTimerHook:
-    def __init__(self, module: Union[List, nn.Module]):
-        self.length = self._get_length(module)
+    def __init__(self,
+                 module: List[nn.Module],
+                 module_name: List[str]):
+        self.length = len(module)
+        self.timer_dict = dict()
+        self.hook_list = []
 
-    def _get_length(self, module: Union[List, nn.Module]):
-        length = 0
-        # make all module becomes nn.ModuleList
-        if not isinstance(module, Iterable):
-            module = [module]
-        if isinstance(module, list):
-            module = nn.ModuleList(module)
-        # count only non-ModuleList and non-Sequential module
-        for m in module.modules():
-            if type(m) != nn.ModuleList and type(m) != nn.Sequential:
-                length += 1
+        for m, n in zip(module, module_name):
+            self.hook_list.append(
+                LayerForwardTimerHook(m)
+            )
+            self.timer_dict[n] = 0
 
-        return length
+    def assign_timer(self):
+        for m_name, hook in zip(list(self.timer_dict.keys()),
+                                self.hook_list):
+            self.timer_dict[m_name] = hook.eval
+
+    def close(self):
+        for h in self.hook_list:
+            h.close()
