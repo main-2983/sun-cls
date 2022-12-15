@@ -30,6 +30,14 @@ class IOHook:
 
 
 class LayerForwardTimerHook:
+    """
+    This hook attached to a nn.Module.
+    This hook is used to measure forward time of a nn.Module
+    In order to view time after a forward pass, access self.eval
+    Args:
+        module (nn.Module): a nn.Module object to attach the hook
+
+    """
     def __init__(self, module: nn.Module):
         self.pre_forward = module.register_forward_pre_hook(self.set_start_timer)
         self.after_forward = module.register_forward_hook(self.set_end_timer)
@@ -49,19 +57,34 @@ class LayerForwardTimerHook:
 
 
 class ModuleForwardTimerHook:
-    def __init__(self, module: Union[List, nn.Module]):
-        self.length = self._get_length(module)
+    """
+    This hook is an extended for LayerForwardTimerHook.
+    It supports multiple module while LayerForwardTimerHook only supports one.
+    Forward time for each module is stored in self.timer_dict
+        with key being name of that module
+        and value being forward time
+    Args:
+        module (List[nn.Module]): List nn.Module objects to attach the hook
+        module_name (List[str]): List of nn.Module names
+    """
+    def __init__(self,
+                 module: List[nn.Module],
+                 module_name: List[str]):
+        self.length = len(module)
+        self.timer_dict = dict()
+        self.hook_list = []
 
-    def _get_length(self, module: Union[List, nn.Module]):
-        length = 0
-        # make all module becomes nn.ModuleList
-        if not isinstance(module, Iterable):
-            module = [module]
-        if isinstance(module, list):
-            module = nn.ModuleList(module)
-        # count only non-ModuleList and non-Sequential module
-        for m in module.modules():
-            if type(m) != nn.ModuleList and type(m) != nn.Sequential:
-                length += 1
+        for m, n in zip(module, module_name):
+            self.hook_list.append(
+                LayerForwardTimerHook(m)
+            )
+            self.timer_dict[n] = 0
 
-        return length
+    def assign_timer(self):
+        for m_name, hook in zip(list(self.timer_dict.keys()),
+                                self.hook_list):
+            self.timer_dict[m_name] = hook.eval
+
+    def close(self):
+        for h in self.hook_list:
+            h.close()
