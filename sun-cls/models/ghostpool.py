@@ -161,16 +161,17 @@ class GhostPool(BaseModule):
         self.out_indices = out_indices
         assert max(out_indices) < self.num_stages
 
+        self.patch_embed_0 = PatchEmbed3D(
+            in_channels=in_channels,
+            out_channels=embed_dims[0],
+            patch_size=patch_size[0],
+            stride=strides[0],
+            padding=patch_size[0]//2,
+            norm_cfg=None
+        )
+
         self.stages = nn.ModuleList()
-        for i, stage_i in range(self.num_stages):
-            patch_embed = PatchEmbed3D(
-                in_channels=in_channels,
-                out_channels=embed_dims[i],
-                patch_size=patch_size[i],
-                stride=strides[i],
-                padding=patch_size[i] // 2,
-                norm_cfg=None
-            )
+        for i, stage_i in enumerate(range(self.num_stages)):
             blocks = []
             for idx in range(num_layers[i]):
                 drop_path_i = drop_path * (idx + sum(num_layers[:i])) / (sum(num_layers) - 1)
@@ -187,10 +188,21 @@ class GhostPool(BaseModule):
                         layer_scale_init_val=layer_scale_init_val
                 ))
             blocks = nn.Sequential(*blocks)
-            in_channels = embed_dims[i]
-            self.stages.append(
-                nn.ModuleList([patch_embed, blocks])
-            )
+            if i < self.num_stages - 1:
+                in_channels = embed_dims[i]
+                patch_embed = PatchEmbed3D(
+                    in_channels=in_channels,
+                    out_channels=embed_dims[i+1],
+                    patch_size=patch_size[i+1],
+                    stride=strides[i+1],
+                    padding=patch_size[i+1] // 2,
+                    norm_cfg=None
+                )
+                self.stages.append(
+                    nn.ModuleList([blocks, patch_embed])
+                )
+            else:
+                self.stages.append(blocks)
 
         if not features_only:
             # add classifier head
@@ -205,5 +217,31 @@ class GhostPool(BaseModule):
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x):
+    def get_classifier(self):
+        return self.head
+
+    def forward_classify(self, backbone_feats, pre_logits: bool=False):
+        x = self.norm(backbone_feats)
+        x = x.mean([-2, -1]) # global avg pooling
+        return x if pre_logits else self.head(x)
+
+    def forward_patch_embed(self, x):
+        x = self.patch_embed_0(x)
+        return x
+
+    def forward_features(self, x):
         outs = []
+        x = self.forward_patch_embed(x) # image patch embedding
+        for i, stage in enumerate(self.stages):
+            x = stage[0](x) # computation block
+            x = stage[1](x) # downsample patch embedding
+            outs.append(x)
+        return outs
+
+    def forward(self, x):
+        outs = self.forward_features(x)
+        if not self.feature_only:
+            outs = self.forward_classify(outs[-1])
+        else:
+            outs = [outs[i] for i in self.out_indices]
+        return outs
