@@ -1,4 +1,6 @@
 import time
+from typing import Union, List
+from collections import Iterable
 
 import torch.nn as nn
 
@@ -50,3 +52,22 @@ class LayerForwardTimerHook:
     def close(self):
         self.pre_forward.remove()
         self.after_forward.remove()
+
+
+class ModuleForwardTimerHook:
+    def __init__(self, module: Union[List, nn.Module]):
+        self.length = self._get_length(module)
+
+    def _get_length(self, module: Union[List, nn.Module]):
+        length = 0
+        # make all module becomes nn.ModuleList
+        if not isinstance(module, Iterable):
+            module = [module]
+        if isinstance(module, list):
+            module = nn.ModuleList(module)
+        # count only non-ModuleList and non-Sequential module
+        for m in module.modules():
+            if type(m) != nn.ModuleList and type(m) != nn.Sequential:
+                length += 1
+
+        return length
