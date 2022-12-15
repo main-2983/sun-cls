@@ -30,10 +30,12 @@ class IOHook:
 
 class LayerForwardTimerHook:
     """
-    This hook attached to a nn.Module to measure the forward time of that module.
-    Call self.eval to get the execution time after perform a forward pass to a module.
+    This hook attached to a nn.Module.
+    This hook is used to measure forward time of a nn.Module
+    In order to view time after a forward pass, access self.eval
     Args:
-         module (nn.Module): a module to attach to hook
+        module (nn.Module): a nn.Module object to attach the hook
+
     """
     def __init__(self, module: nn.Module):
         self.pre_forward = module.register_forward_pre_hook(self.set_start_timer)
@@ -54,6 +56,16 @@ class LayerForwardTimerHook:
 
 
 class ModuleForwardTimerHook:
+    """
+    This hook is an extended for LayerForwardTimerHook.
+    It supports multiple module while LayerForwardTimerHook only supports one.
+    Forward time for each module is stored in self.timer_dict
+        with key being name of that module
+        and value being forward time
+    Args:
+        module (List[nn.Module]): List nn.Module objects to attach the hook
+        module_name (List[str]): List of nn.Module names
+    """
     def __init__(self,
                  module: List[nn.Module],
                  module_name: List[str]):
